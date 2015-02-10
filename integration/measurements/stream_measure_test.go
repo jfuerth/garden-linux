@@ -155,11 +155,13 @@ var _ = Describe("The Garden server", func() {
 	})
 
 	FDescribe("streaming output from a chatty job", func() {
-		streamCounts := []int{}
+		streamCounts := []int{1, 4, 8}
 
-		for i := 1; i <= 128; i *= 2 {
-			streamCounts = append(streamCounts, i)
-		}
+		// for i := 1; i <= 128; i *= 2 {
+		// streamCounts = append(streamCounts, i)
+		// }
+
+		loggedLine := strings.Repeat("x", 1024)
 
 		for _, streams := range streamCounts {
 			Context(fmt.Sprintf("with %d streams", streams), func() {
@@ -181,13 +183,10 @@ var _ = Describe("The Garden server", func() {
 							defer GinkgoRecover()
 
 							process, err := container.Run(garden.ProcessSpec{
-								Path: "cat",
-								Args: []string{"/dev/zero"},
+								Path: "sh",
+								Args: []string{"-c", "while true; do echo " + loggedLine + "; done"},
 							}, garden.ProcessIO{})
-							println("RETURNED FROM RUN")
 							Ω(err).ShouldNot(HaveOccurred())
-
-							println("WEBSCALE ATTACHING")
 
 							spawned <- true
 
