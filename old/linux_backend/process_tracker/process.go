@@ -3,6 +3,7 @@ package process_tracker
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -165,28 +166,30 @@ func (p *Process) Spawn(cmd *exec.Cmd, tty *garden.TTYSpec) (ready, active chan 
 	return
 }
 
-func (p *Process) Link() {
-	p.runningLink.Do(p.runLinker)
+func (p *Process) Link(stdoutW io.Writer) {
+	p.runningLink.Do(func() {
+		p.runLinker(stdoutW)
+	})
 }
 
 func (p *Process) Attach(processIO garden.ProcessIO) {
-	if processIO.Stdin != nil {
-		p.stdin.AddSource(processIO.Stdin)
-	}
-
-	if processIO.Stdout != nil {
-		p.stdout.AddSink(processIO.Stdout)
-	}
-
-	if processIO.Stderr != nil {
-		p.stderr.AddSink(processIO.Stderr)
-	}
+	// if processIO.Stdin != nil {
+	// 	p.stdin.AddSource(processIO.Stdin)
+	// }
+	//
+	// if processIO.Stdout != nil {
+	// 	p.stdout.AddSink(processIO.Stdout)
+	// }
+	//
+	// if processIO.Stderr != nil {
+	// 	p.stderr.AddSink(processIO.Stderr)
+	// }
 }
 
-func (p *Process) runLinker() {
+func (p *Process) runLinker(stdoutW io.Writer) {
 	processSock := path.Join(p.containerPath, "processes", fmt.Sprintf("%d.sock", p.ID()))
 
-	link, err := link.Create(processSock, p.stdout, p.stderr)
+	link, err := link.Create(processSock, stdoutW, p.stderr)
 	if err != nil {
 		p.completed(-1, err)
 		return

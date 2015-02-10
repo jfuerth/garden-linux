@@ -37,6 +37,8 @@ const (
 	GetProperty    = "GetProperty"
 	SetProperty    = "SetProperty"
 	RemoveProperty = "RemoveProperty"
+
+	WebscaleAttach = "WebscaleAttach"
 )
 
 var Routes = rata.Routes{
@@ -75,4 +77,6 @@ var Routes = rata.Routes{
 	{Path: "/containers/:handle/properties/:key", Method: "GET", Name: GetProperty},
 	{Path: "/containers/:handle/properties/:key", Method: "PUT", Name: SetProperty},
 	{Path: "/containers/:handle/properties/:key", Method: "DELETE", Name: RemoveProperty},
+
+	{Path: "/containers/:handle/processes/:pid/webscale-attach", Method: "GET", Name: WebscaleAttach},
 }

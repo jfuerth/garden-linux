@@ -2,6 +2,7 @@ package process_tracker
 
 import (
 	"fmt"
+	"io"
 	"os/exec"
 	"sync"
 
@@ -12,6 +13,7 @@ import (
 type ProcessTracker interface {
 	Run(uint32, *exec.Cmd, garden.ProcessIO, *garden.TTYSpec, Signaller) (garden.Process, error)
 	Attach(uint32, garden.ProcessIO) (garden.Process, error)
+	WebscaleAttach(uint32, io.Writer) error
 	Restore(processID uint32, signaller Signaller)
 	ActiveProcesses() []garden.Process
 }
@@ -51,21 +53,23 @@ func (t *processTracker) Run(processID uint32, cmd *exec.Cmd, processIO garden.P
 
 	t.processesMutex.Unlock()
 
-	ready, active := process.Spawn(cmd, tty)
+	ready, _ := process.Spawn(cmd, tty)
 
 	err := <-ready
 	if err != nil {
 		return nil, err
 	}
 
-	process.Attach(processIO)
+	println("RUNNING")
 
-	go t.link(process.ID())
+	// process.Attach(processIO)
 
-	err = <-active
-	if err != nil {
-		return nil, err
-	}
+	// go t.link(process.ID())
+
+	// err = <-active
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return process, nil
 }
@@ -79,11 +83,27 @@ func (t *processTracker) Attach(processID uint32, processIO garden.ProcessIO) (g
 		return nil, UnknownProcessError{processID}
 	}
 
-	process.Attach(processIO)
+	// process.Attach(processIO)
 
-	go t.link(processID)
+	// go t.link(processID)
 
 	return process, nil
+}
+
+func (t *processTracker) WebscaleAttach(processID uint32, stdoutW io.Writer) error {
+	t.processesMutex.RLock()
+	process, ok := t.processes[processID]
+	t.processesMutex.RUnlock()
+
+	if !ok {
+		return UnknownProcessError{processID}
+	}
+
+	println("LINKING")
+
+	process.Link(stdoutW)
+	return nil
+	// return process.WebscaleAttach(stdoutW)
 }
 
 func (t *processTracker) Restore(processID uint32, signaller Signaller) {
@@ -93,7 +113,7 @@ func (t *processTracker) Restore(processID uint32, signaller Signaller) {
 
 	t.processes[processID] = process
 
-	go t.link(processID)
+	// go t.link(processID)
 
 	t.processesMutex.Unlock()
 }
@@ -113,7 +133,7 @@ func (t *processTracker) ActiveProcesses() []garden.Process {
 	return processes
 }
 
-func (t *processTracker) link(processID uint32) {
+func (t *processTracker) link(processID uint32, stdoutW io.Writer) {
 	t.processesMutex.RLock()
 	process, ok := t.processes[processID]
 	t.processesMutex.RUnlock()
@@ -124,7 +144,7 @@ func (t *processTracker) link(processID uint32) {
 
 	defer t.unregister(processID)
 
-	process.Link()
+	process.Link(stdoutW)
 
 	return
 }

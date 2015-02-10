@@ -808,6 +808,7 @@ func (s *GardenServer) handleRun(w http.ResponseWriter, r *http.Request) {
 		Stderr: &chanWriter{stderr},
 	}
 
+	println("RUNNING IN HANDLER")
 	process, err := container.Run(request, processIO)
 	if err != nil {
 		s.writeError(w, err, hLog)
@@ -830,6 +831,8 @@ func (s *GardenServer) handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer conn.Close()
+
+	println("WRITING PID")
 
 	transport.WriteMessage(conn, &transport.ProcessPayload{
 		ProcessID: process.ID(),
@@ -905,6 +908,50 @@ func (s *GardenServer) handleAttach(w http.ResponseWriter, r *http.Request) {
 	go s.streamInput(json.NewDecoder(br), stdinW, process)
 
 	s.streamProcess(hLog, conn, process, stdout, stderr, stdinW)
+}
+
+func (s *GardenServer) handleWebscaleAttach(w http.ResponseWriter, r *http.Request) {
+	handle := r.FormValue(":handle")
+
+	var processID uint32
+
+	hLog := s.logger.Session("webscale-attach", lager.Data{
+		"handle": handle,
+	})
+
+	_, err := fmt.Sscanf(r.FormValue(":pid"), "%d", &processID)
+	if err != nil {
+		s.writeError(w, err, hLog)
+		return
+	}
+
+	container, err := s.backend.Lookup(handle)
+	if err != nil {
+		s.writeError(w, err, hLog)
+		return
+	}
+
+	s.bomberman.Pause(container.Handle())
+	defer s.bomberman.Unpause(container.Handle())
+
+	hLog.Info("attaching", lager.Data{
+		"id": processID,
+	})
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/octet-stream")
+
+	conn, _, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		s.writeError(w, err, hLog)
+		return
+	}
+
+	err = container.WebscaleAttach(processID, conn)
+	if err != nil {
+		s.writeError(w, err, hLog)
+		return
+	}
 }
 
 func (s *GardenServer) handleInfo(w http.ResponseWriter, r *http.Request) {

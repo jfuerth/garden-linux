@@ -816,6 +816,10 @@ func (c *LinuxContainer) Attach(processID uint32, processIO garden.ProcessIO) (g
 	return c.processTracker.Attach(processID, processIO)
 }
 
+func (c *LinuxContainer) WebscaleAttach(processID uint32, stdoutW io.Writer) error {
+	return c.processTracker.WebscaleAttach(processID, stdoutW)
+}
+
 func (c *LinuxContainer) NetIn(hostPort uint32, containerPort uint32) (uint32, uint32, error) {
 	if hostPort == 0 {
 		randomPort, err := c.portPool.Acquire()

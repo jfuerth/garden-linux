@@ -16,6 +16,9 @@ type Link struct {
 	streaming  *sync.WaitGroup
 }
 
+const SPLICE_F_MOVE = 1
+const SPLICE_F_MORE = 4
+
 func Create(socketPath string, stdout io.Writer, stderr io.Writer) (*Link, error) {
 	conn, err := net.Dial("unix", socketPath)
 	if err != nil {
@@ -58,9 +61,20 @@ func Create(socketPath string, stdout io.Writer, stderr io.Writer) (*Link, error
 
 	linkWriter := NewWriter(conn)
 
+	// pgsize := syscall.Getpagesize()
+
 	streaming.Add(1)
 	go func() {
 		io.Copy(stdout, lstdout)
+
+		// for {
+		// 	_, err := syscall.Splice(int(lstdout.Fd()), nil, int(stdout.Fd()), nil, pgsize, SPLICE_F_MORE|SPLICE_F_MOVE)
+		// 	if err != nil {
+		// 		println(err.Error())
+		// 		return
+		// 	}
+		// }
+
 		lstdout.Close()
 		streaming.Done()
 	}()

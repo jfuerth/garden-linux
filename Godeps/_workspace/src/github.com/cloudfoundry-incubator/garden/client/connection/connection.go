@@ -64,6 +64,8 @@ type Connection interface {
 	GetProperty(handle string, name string) (string, error)
 	SetProperty(handle string, name string, value string) error
 	RemoveProperty(handle string, name string) error
+
+	WebscaleAttach(handle string, processID uint32, stdoutW io.Writer) error
 }
 
 type connection struct {
@@ -222,6 +224,31 @@ func (c *connection) Attach(handle string, processID uint32, processIO garden.Pr
 	go p.streamPayloads(decoder, processIO)
 
 	return p, nil
+}
+
+const SPLICE_F_MOVE = 1
+const SPLICE_F_MORE = 4
+
+func (c *connection) WebscaleAttach(handle string, processID uint32, stdoutW io.Writer) error {
+	reqBody := new(bytes.Buffer)
+
+	conn, _, err := c.doHijack(
+		routes.WebscaleAttach,
+		reqBody,
+		rata.Params{
+			"handle": handle,
+			"pid":    fmt.Sprintf("%d", processID),
+		},
+		nil,
+		"",
+	)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(stdoutW, conn)
+	return err
 }
 
 func (c *connection) NetIn(handle string, hostPort, containerPort uint32) (uint32, uint32, error) {

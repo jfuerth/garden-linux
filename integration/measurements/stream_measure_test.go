@@ -154,8 +154,8 @@ var _ = Describe("The Garden server", func() {
 		}, 1)
 	})
 
-	Describe("streaming output from a chatty job", func() {
-		streamCounts := []int{0}
+	FDescribe("streaming output from a chatty job", func() {
+		streamCounts := []int{}
 
 		for i := 1; i <= 128; i *= 2 {
 			streamCounts = append(streamCounts, i)
@@ -180,15 +180,19 @@ var _ = Describe("The Garden server", func() {
 						go func() {
 							defer GinkgoRecover()
 
-							_, err := container.Run(garden.ProcessSpec{
+							process, err := container.Run(garden.ProcessSpec{
 								Path: "cat",
 								Args: []string{"/dev/zero"},
-							}, garden.ProcessIO{
-								Stdout: byteCounter,
-							})
+							}, garden.ProcessIO{})
+							println("RETURNED FROM RUN")
 							Ω(err).ShouldNot(HaveOccurred())
 
+							println("WEBSCALE ATTACHING")
+
 							spawned <- true
+
+							err = container.WebscaleAttach(process.ID(), byteCounter)
+							Ω(err).ShouldNot(HaveOccurred())
 						}()
 					}
 
@@ -219,14 +223,14 @@ var _ = Describe("The Garden server", func() {
 						})
 					}
 
-					for i := 0; i < 10; i++ {
-						b.Time("running a job (10x)", func() {
-							process, err := newContainer.Run(garden.ProcessSpec{Path: "ls"}, garden.ProcessIO{})
-							Ω(err).ShouldNot(HaveOccurred())
-
-							Ω(process.Wait()).Should(Equal(0))
-						})
-					}
+					// for i := 0; i < 10; i++ {
+					// 	b.Time("running a job (10x)", func() {
+					// 		process, err := newContainer.Run(garden.ProcessSpec{Path: "ls"}, garden.ProcessIO{})
+					// 		Ω(err).ShouldNot(HaveOccurred())
+					//
+					// 		Ω(process.Wait()).Should(Equal(0))
+					// 	})
+					// }
 
 					b.Time("destroying the container", func() {
 						err := client.Destroy(newContainer.Handle())

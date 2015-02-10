@@ -128,6 +128,8 @@ type Container interface {
 	// Errors:
 	// * None.
 	RemoveProperty(name string) error
+
+	WebscaleAttach(processID uint32, stdoutW io.Writer) error
 }
 
 // ProcessSpec contains parameters for running a script inside a container.

@@ -120,3 +120,7 @@ func (container *container) SetProperty(name string, value string) error {
 func (container *container) RemoveProperty(name string) error {
 	return container.connection.RemoveProperty(container.handle, name)
 }
+
+func (container *container) WebscaleAttach(processID uint32, stdoutW io.Writer) error {
+	return container.connection.WebscaleAttach(container.handle, processID, stdoutW)
+}
