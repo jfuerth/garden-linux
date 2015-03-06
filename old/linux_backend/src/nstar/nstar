@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#
+# This script is a temporary workaround that can be used in place of the real
+# nstar executable to get diego working on RHEL 7 stemcells. It's definitely
+# not recommended for real use!
+#
+# See https://www.pivotaltracker.com/story/show/86946906 for details.
+#
+
+set -e
+set -x
+
+wshd_pid="$1"
+user="$2"
+dest="$3"
+fetch="$4"
+
+#container_handle=`ps axww | grep "^ $wshd_pid" | sed "s/.*wshd: //"`
+container_handle=`echo $0 | sed 's/\/var.*\/depot\///' | sed 's/\/bin\/.*//'`
+container_root=/var/vcap/data/garden-linux/overlays/$container_handle/rootfs
+
+uid=`grep "^$user:" $container_root/etc/passwd | cut -d : -f 3`
+
+if [ -z "$fetch" ]; then
+chroot $container_root bash -e -c "
+cd /
+mkdir -p $dest
+cd $dest
+tar xf -
+chown -R $uid:$uid .
+"
+exit 0
+fi
+
+chroot $container_root bash -e -c "
+cd /
+mkdir -p $dest
+cd $dest
+tar cf - $fetch
+"

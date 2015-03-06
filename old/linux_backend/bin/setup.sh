@@ -49,8 +49,41 @@ function mount_nested_cgroup() {
 
 if [ ! -d $cgroup_path ]
 then
-  mount_nested_cgroup $cgroup_path || \
-    mount_flat_cgroup $cgroup_path
+
+date >> /tmp/diego-release-setup-sh
+echo "Setting up cgroups at $cgroup_path" >> /tmp/diego-release-setup-sh
+
+#temp code for RHEL 7 testing
+  mkdir -p $cgroup_path
+
+  if ! mountpoint -q $cgroup_path; then
+    mount -t tmpfs -o uid=0,gid=0,mode=0755 cgroup $cgroup_path
+  fi
+
+  mkdir -p $cgroup_path/cpuset
+  mkdir -p $cgroup_path/cpu,cpuacct
+  mkdir -p $cgroup_path/memory
+  mkdir -p $cgroup_path/devices
+  mkdir -p $cgroup_path/freezer
+  mkdir -p $cgroup_path/net_cls
+  mkdir -p $cgroup_path/blkio
+  mkdir -p $cgroup_path/perf_event
+  mkdir -p $cgroup_path/hugetlb
+
+  for subsystem in $(ls $cgroup_path); do
+    if ! mountpoint -q $subsystem; then
+      echo "mount -n -t cgroup -o $(basename $subsystem) cgroup $subsystem" >> /tmp/diego-release-setup-sh
+      mount -n -t cgroup -o $(basename $subsystem) cgroup $cgroup_path/$subsystem
+    fi
+  done
+
+  rm -rf $cgroup_path/cpu $cgroup_path/cpuacct
+  ln -s cpu,cpuacct $cgroup_path/cpu
+  ln -s cpu,cpuacct $cgroup_path/cpuacct
+
+#  mount_nested_cgroup $cgroup_path || \
+#    mount_flat_cgroup $cgroup_path
+
 fi
 
 ./net.sh setup

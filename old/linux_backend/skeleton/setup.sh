@@ -57,6 +57,8 @@ function adddev()
   chown root:${own} ${file}
 }
 
+mkdir -p $rootfs_path/dev
+
 # /dev/tty
 adddev tty  $rootfs_path/dev/tty     5 0
 # /dev/random, /dev/urandom

@@ -21,6 +21,7 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "barrier.h"
 #include "msg.h"
@@ -738,6 +739,11 @@ int child_run(void *data) {
   rv = barrier_wait(&w->barrier_parent);
   assert(rv == 0);
 
+  rv = unshare(CLONE_NEWNS);
+  if (rv == -1) {
+    perror("unshare");
+  }
+
   rv = run(w->lib_path, "hook-child-before-pivot.sh");
   assert(rv == 0);
 
@@ -749,6 +755,12 @@ int child_run(void *data) {
   rv = mount(w->root_path, w->root_path, NULL, MS_BIND|MS_REC, NULL);
   if(rv == -1) {
     perror("mount");
+    abort();
+  }
+
+  rv = mount(w->root_path, w->root_path, NULL, MS_REC|MS_PRIVATE, NULL);
+  if(rv == -1) {
+    perror("make private mount");
     abort();
   }
 
@@ -765,15 +777,36 @@ int child_run(void *data) {
     abort();
   }
 
-  rv = mkdir("tmp/garden-host", 0700);
+  const char *garden_host_path = "/tmp/garden-host";
+  char *absolute_garden_host_path = malloc(strlen(w->root_path) + strlen(garden_host_path) + 1);
+  strcpy(absolute_garden_host_path, w->root_path);
+  strcat(absolute_garden_host_path, garden_host_path);
+
+  rv = mkdir(absolute_garden_host_path, 0700);
   if (rv == -1 && errno != EEXIST) {
     perror("mkdir");
     abort();
   }
 
-  rv = pivot_root(".", "tmp/garden-host");
+  rv = mount("/", absolute_garden_host_path, NULL, MS_BIND|MS_PRIVATE, NULL);
+  if(rv == -1) {
+    perror("bind mounting host root");
+    abort();
+  }
+
+  char vcap_mount_point[PATH_MAX];
+  strcpy(vcap_mount_point, absolute_garden_host_path);
+  strcat(vcap_mount_point, "/var/vcap/data");
+
+  rv = mount("/var/vcap/data", vcap_mount_point, NULL, MS_BIND|MS_PRIVATE, NULL);
+  if(rv == -1) {
+    perror("bind mounting /var/vcap/data");
+    abort();
+  }
+
+  rv = chroot(".");
   if (rv == -1) {
-    perror("pivot_root");
+    perror("chroot");
     abort();
   }
 
@@ -817,6 +850,8 @@ int child_run(void *data) {
   execl("/sbin/wshd", "/sbin/wshd", "--continue", NULL);
   perror("exec");
   abort();
+
+  free(absolute_garden_host_path);
 }
 
 int child_continue(int argc, char **argv) {
@@ -834,6 +869,12 @@ int child_continue(int argc, char **argv) {
   }
 
   /* Clean up temporary pivot_root dir */
+  rv = umount2("/tmp/garden-host/var/vcap/data", MNT_DETACH);
+  if (rv == -1) {
+    perror("unmount2");
+    exit(1);
+  }
+
   rv = umount2("/tmp/garden-host", MNT_DETACH);
   if (rv == -1) {
     perror("unmount2");
@@ -1018,6 +1059,10 @@ int parent_run(wshd_t *w) {
   return 0;
 }
 
+void dumblog(int fd, char *buf) {
+  write(fd, buf, strlen(buf));
+}
+
 int main(int argc, char **argv) {
   wshd_t *w;
   int rv;
@@ -1026,6 +1071,18 @@ int main(int argc, char **argv) {
   if (argc > 1 && strcmp(argv[1], "--continue") == 0) {
     return child_continue(argc, argv);
   }
+
+  int f = open("/tmp/wshd-log", O_CREAT|O_APPEND|O_WRONLY);
+  char buf[1024];
+  time_t curtime;
+  time(&curtime);
+  sprintf(buf, "wshd started at %s\n", ctime(&curtime));
+  dumblog(f, buf);
+  sprintf(buf, "  my pid:  %d\n", getpid());
+  dumblog(f, buf);
+  sprintf(buf, "  my ppid: %d\n", getppid());
+  dumblog(f, buf);
+  close(f);
 
   w = calloc(1, sizeof(*w));
   assert(w != NULL);

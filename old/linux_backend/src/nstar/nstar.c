@@ -139,8 +139,8 @@ int main(int argc, char **argv) {
 
   usrnsfd = open(usrnspath, O_RDONLY);
   if(usrnsfd == -1) {
-    perror("open user namespace");
-    return 1;
+    // perror("open user namespace");
+    // don't abort the program; user namespacing is not supported yet on RHEL 7
   }
 
   /* switch to container's mount namespace/rootfs */
@@ -153,7 +153,9 @@ int main(int argc, char **argv) {
 
   /* switch to container's user namespace so that user lookup returns correct uids */
   /* we allow this to fail if the container isn't user-namespaced */
-  setns(usrnsfd, CLONE_NEWUSER);
+  if(usrnsfd != -1) {
+    setns(usrnsfd, CLONE_NEWUSER);
+  }
 
   pw = getpwnam(user);
   if(pw == NULL) {

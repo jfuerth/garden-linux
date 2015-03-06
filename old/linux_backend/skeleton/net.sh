@@ -9,6 +9,9 @@ cd $(dirname "${0}")
 
 source ./etc/config
 
+echo "Adding /usr/sbin to current PATH: $PATH"
+export PATH=$PATH:/usr/sbin
+
 filter_forward_chain="${GARDEN_IPTABLES_FILTER_FORWARD_CHAIN}"
 filter_default_chain="${GARDEN_IPTABLES_FILTER_DEFAULT_CHAIN}"
 filter_instance_prefix="${GARDEN_IPTABLES_FILTER_INSTANCE_PREFIX}"

@@ -17,7 +17,7 @@ then
   exec $(dirname $0)/ubuntu.sh $@
 fi
 
-if grep -q -i centos /etc/issue
+if [ -f /etc/redhat-release ] # matches CentOS and RHEL
 then
   exec $(dirname $0)/centos.sh $@
 fi

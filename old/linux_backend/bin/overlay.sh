@@ -24,25 +24,34 @@ function overlay_directory_in_rootfs() {
   mount -n --bind -o remount,$2 $overlay_path/$1 $rootfs_path/$1
 }
 
+# Guide to variables in this script:
+# $base_path - the original, shared rootfs_lucid64.               eg. /var/vcap/packages/rootfs_lucid64
+# $rootfs_path - the container's read-only mirror of $base_path.  eg. /var/vcap/data/garden-linux/overlays/hi7rikbrget/rootfs
+# $overlay_path - the container's read/write copy of $rootfs_path eg. /var/vcap/data/garden-linux/overlays/hi7rikbrget/overlay
+
 function setup_fs_other() {
   mkdir -p $base_path/proc
+  mkdir -p $base_path/run
 
-  mount -n --bind $base_path $rootfs_path
-  mount -n --bind -o remount,ro $base_path $rootfs_path
+#  mount -n --bind $base_path $rootfs_path
+#  mount -n --bind -o remount,ro $base_path $rootfs_path
+#
+#  overlay_directory_in_rootfs /dev rw
+#  overlay_directory_in_rootfs /etc rw
+#  overlay_directory_in_rootfs /home rw
+#  overlay_directory_in_rootfs /root rw
+#  overlay_directory_in_rootfs /sbin rw
+#  overlay_directory_in_rootfs /var rw
+#
+#  mkdir -p $overlay_path/run
+#  overlay_directory_in_rootfs /run rw
+#
+#  mkdir -p $overlay_path/tmp
+#  chmod 777 $overlay_path/tmp
+#  overlay_directory_in_rootfs /tmp rw
 
-  overlay_directory_in_rootfs /dev rw
-  overlay_directory_in_rootfs /etc rw
-  overlay_directory_in_rootfs /home rw
-  overlay_directory_in_rootfs /root rw
-  overlay_directory_in_rootfs /sbin rw
-  overlay_directory_in_rootfs /var rw
-
-  mkdir -p $overlay_path/run
-  overlay_directory_in_rootfs /run rw
-
-  mkdir -p $overlay_path/tmp
-  chmod 777 $overlay_path/tmp
-  overlay_directory_in_rootfs /tmp rw
+   echo "FS copy command: rsync -ax $base_path/ $rootfs_path"
+   rsync -ax $base_path/ $rootfs_path
 }
 
 function get_mountpoint() {
@@ -121,8 +130,12 @@ function rootfs_mountpoints() {
 
 function teardown_fs() {
   for i in $(seq 10); do
-    local mountpoints=$(rootfs_mountpoints)
-    if [ -z "$mountpoints" ] || umount $mountpoints; then
+
+    if [ ! -z "$(rootfs_mountpoints)" ]; then
+      umount $(rootfs_mountpoints) || true
+    fi
+
+    if [ -z "$(rootfs_mountpoints)" ]; then
       if rm -rf $container_path; then
         return 0
       fi
@@ -131,6 +144,7 @@ function teardown_fs() {
     sleep 0.5
   done
 
+  echo "Failed to unmount all filesystems inside the container $container_path"
   return 1
 }
 
